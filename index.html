@@ -1,0 +1,1985 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ASTRA — Text Encryptor</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=IBM+Plex+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+:root {
+  --bg: #080a10;
+  --panel: #0d1019;
+  --surface: #131824;
+  --surface2: #1a2133;
+  --border: #1f2d45;
+  --border2: #2a3d5a;
+  --accent: #00e5c8;
+  --accent-dim: rgba(0,229,200,0.08);
+  --accent-mid: rgba(0,229,200,0.15);
+  --accent2: #7b5cf6;
+  --accent2-dim: rgba(123,92,246,0.08);
+  --gold: #f5c842;
+  --gold-dim: rgba(245,200,66,0.1);
+  --danger: #ff4571;
+  --danger-dim: rgba(255,69,113,0.08);
+  --text: #dde8f5;
+  --text2: #6b88a8;
+  --muted: #2d445f;
+  --ff: 'Syne', sans-serif;
+  --fm: 'IBM Plex Mono', monospace;
+  --r: 16px;
+  --rs: 10px;
+  --glow: 0 0 30px rgba(0,229,200,0.18);
+  --glow2: 0 0 30px rgba(123,92,246,0.18);
+  --tr: 0.2s ease;
+  --shadow: 0 8px 40px rgba(0,0,0,0.5);
+}
+.light {
+  --bg: #f0f2f8;
+  --panel: #fff;
+  --surface: #f5f7fc;
+  --surface2: #eaeef8;
+  --border: #d4dcec;
+  --border2: #bcc8de;
+  --accent: #008c7a;
+  --accent-dim: rgba(0,140,122,0.07);
+  --accent-mid: rgba(0,140,122,0.13);
+  --accent2: #6040d4;
+  --accent2-dim: rgba(96,64,212,0.07);
+  --gold: #c49a00;
+  --gold-dim: rgba(196,154,0,0.08);
+  --danger: #d4244a;
+  --danger-dim: rgba(212,36,74,0.07);
+  --text: #0e1726;
+  --text2: #4a6080;
+  --muted: #9bb0c8;
+  --shadow: 0 4px 24px rgba(0,0,0,0.12);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  font-family: var(--fm);
+  background: var(--bg);
+  color: var(--text);
+  height: 100%;
+  overflow: hidden;
+  transition: background .3s, color .3s;
+}
+
+.bg-layer { position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
+.bg-noise {
+  position: absolute; inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+  opacity: 0.4;
+}
+.bg-grid {
+  position: absolute; inset: 0;
+  background-image:
+    linear-gradient(rgba(0,229,200,0.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,229,200,0.018) 1px, transparent 1px);
+  background-size: 44px 44px;
+}
+.light .bg-grid {
+  background-image:
+    linear-gradient(rgba(0,100,88,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,100,88,0.04) 1px, transparent 1px);
+}
+.bg-orb1 { position: absolute; width: 420px; height: 420px; top: -140px; left: -100px; background: radial-gradient(circle, rgba(0,229,200,0.05) 0%, transparent 65%); animation: orbPulse 10s ease-in-out infinite; }
+.bg-orb2 { position: absolute; width: 360px; height: 360px; bottom: -100px; right: -80px; background: radial-gradient(circle, rgba(123,92,246,0.06) 0%, transparent 65%); animation: orbPulse 13s ease-in-out infinite reverse; }
+@keyframes orbPulse { 0%,100%{transform:scale(1) translate(0,0);} 50%{transform:scale(1.08) translate(12px,10px);} }
+
+.screen { position: fixed; inset: 0; z-index: 9000; display: none; flex-direction: column; align-items: center; justify-content: center; padding: 24px; background: var(--bg); overflow-y: auto; }
+.screen.active { display: flex; }
+
+@keyframes fadeUp { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes shake { 0%,100%{transform:translateX(0);} 20%{transform:translateX(-8px);} 40%{transform:translateX(8px);} 60%{transform:translateX(-5px);} 80%{transform:translateX(5px);} }
+@keyframes popIn { from{transform:scale(0.88);opacity:0;} to{transform:scale(1);opacity:1;} }
+
+.brand { display: flex; flex-direction: column; align-items: center; gap: 12px; margin-bottom: 24px; animation: fadeUp .5s ease both; }
+
+.brand-logo {
+  width: 88px; height: 88px;
+  display: flex; align-items: center; justify-content: center;
+  position: relative;
+  animation: lockFloat 3.5s ease-in-out infinite;
+}
+.brand-logo::before {
+  content: '';
+  position: absolute; inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, var(--accent), var(--accent2), var(--accent));
+  animation: ringRotate 4s linear infinite;
+  opacity: 0.6;
+  padding: 2px;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+.brand-logo::after {
+  content: '';
+  position: absolute; inset: 6px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, rgba(0,229,200,0.12), rgba(123,92,246,0.08) 60%, transparent);
+  backdrop-filter: blur(2px);
+}
+@keyframes ringRotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes lockFloat {
+  0%,100% { transform: translateY(0) scale(1); }
+  30%     { transform: translateY(-7px) scale(1.03); }
+  60%     { transform: translateY(-3px) scale(1.01); }
+}
+.lock-svg { position: relative; z-index: 2; width: 42px; height: 42px; }
+.lock-svg .shackle { stroke: var(--accent); stroke-width: 3.5; fill: none; stroke-linecap: round; animation: shackleAnim 3.5s ease-in-out infinite; transform-origin: center bottom; }
+.lock-svg .body { fill: none; stroke: var(--accent); stroke-width: 3; stroke-linejoin: round; }
+.lock-svg .keyhole { fill: var(--accent); animation: keyholeGlow 3.5s ease-in-out infinite; }
+@keyframes shackleAnim { 0%,100% { transform: translateY(0); } 35% { transform: translateY(-3px); } }
+@keyframes keyholeGlow { 0%,100% { opacity: 0.7; } 50% { opacity: 1; filter: drop-shadow(0 0 4px var(--accent)); } }
+
+.brand-name {
+  font-family: var(--ff);
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: 6px;
+  text-transform: uppercase;
+  background: linear-gradient(135deg, var(--accent) 20%, var(--accent2) 80%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.brand-sub { font-size: 10px; color: var(--text2); letter-spacing: 4px; text-transform: uppercase; font-family: var(--ff); opacity: 0.7; }
+.brand-dev {
+  font-family: var(--ff);
+  font-size: 9px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--muted);
+  opacity: 0.75;
+  margin-top: -4px;
+}
+.brand-dev span {
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-weight: 700;
+}
+
+.auth-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: 24px 20px;
+  width: 100%; max-width: 340px;
+  position: relative; overflow: hidden;
+  animation: fadeUp .5s .1s ease both;
+  box-shadow: var(--shadow);
+}
+.auth-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, var(--accent), var(--accent2), transparent); }
+
+.field-label { font-family: var(--ff); font-size: 10px; font-weight: 700; letter-spacing: 2.5px; color: var(--text2); text-transform: uppercase; margin-bottom: 7px; display: block; }
+.field-wrap { position: relative; margin-bottom: 12px; }
+.field-input {
+  width: 100%; padding: 13px 44px 13px 15px;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--rs);
+  color: var(--text); font-family: var(--fm); font-size: 15px;
+  outline: none;
+  transition: border-color var(--tr), box-shadow var(--tr);
+}
+.field-input:focus { border-color: var(--accent); box-shadow: var(--glow); }
+.field-eye { position: absolute; right: 13px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 16px; cursor: pointer; user-select: none; }
+
+.pw-strength { height: 3px; border-radius: 2px; margin-top: -8px; margin-bottom: 10px; background: var(--surface); transition: all .3s; overflow: hidden; }
+.pw-strength-bar { height: 100%; border-radius: 2px; transition: width .4s ease, background .4s ease; width: 0%; }
+
+.auth-btn {
+  width: 100%; padding: 14px;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  border: none; border-radius: var(--rs);
+  color: #fff; font-family: var(--ff); font-weight: 700; font-size: 13px; letter-spacing: 2px;
+  cursor: pointer;
+  transition: opacity var(--tr), transform .1s;
+  text-transform: uppercase; margin-top: 4px;
+  box-shadow: 0 4px 20px rgba(0,229,200,0.2);
+}
+.auth-btn:active { transform: scale(0.97); opacity: .88; }
+.auth-err { color: var(--danger); font-size: 12px; text-align: center; margin-top: 8px; min-height: 16px; font-family: var(--ff); }
+.auth-err.shake { animation: shake .35s ease; }
+.auth-link { text-align: center; margin-top: 12px; font-family: var(--ff); font-size: 12px; color: var(--text2); }
+.auth-link span { color: var(--accent2); cursor: pointer; font-weight: 700; }
+.auth-back { display: flex; align-items: center; gap: 6px; font-family: var(--ff); font-size: 13px; color: var(--text2); cursor: pointer; margin-bottom: 18px; align-self: flex-start; width: 100%; max-width: 340px; font-weight: 600; }
+
+/* PIN PAD */
+.pin-dots {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin: 14px 0 18px;
+  min-height: 20px;
+  max-width: 280px;
+  align-self: center;
+}
+.pin-dot {
+  width: 11px; height: 11px;
+  border-radius: 50%;
+  border: 2px solid var(--border2);
+  transition: all .2s;
+  flex-shrink: 0;
+}
+.pin-dot.filled { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 10px rgba(0,229,200,0.5); transform: scale(1.1); }
+.pin-dot.error  { background: var(--danger); border-color: var(--danger); }
+
+.pin-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; }
+.pin-key {
+  height: 58px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  font-family: var(--ff); font-size: 20px; font-weight: 700;
+  color: var(--text);
+  cursor: pointer;
+  transition: all .15s;
+  display: flex; align-items: center; justify-content: center;
+}
+.pin-key:active { background: var(--accent-mid); border-color: var(--accent); transform: scale(0.94); }
+.pin-key.empty  { pointer-events: none; background: transparent; border-color: transparent; }
+.pin-key.confirm-key {
+  background: var(--accent-dim);
+  border-color: rgba(0,229,200,0.25);
+  color: var(--accent);
+  font-size: 16px;
+}
+.pin-key.confirm-key:active { background: var(--accent-mid); }
+.pin-key.confirm-key.disabled-key { opacity: 0.28; pointer-events: none; }
+
+.pin-label { font-family: var(--ff); font-size: 13px; color: var(--text2); text-align: center; margin-bottom: 4px; font-weight: 600; }
+.pin-hint  { font-family: var(--ff); font-size: 10px; color: var(--muted); text-align: center; margin-top: 6px; letter-spacing: .5px; }
+
+.bio-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 12px; margin-top: 10px; border: 1.5px dashed var(--border2); border-radius: var(--rs); background: transparent; color: var(--text2); font-family: var(--ff); font-size: 12px; font-weight: 600; cursor: pointer; transition: all .2s; letter-spacing: 1px; }
+.bio-btn:active { border-color: var(--accent); color: var(--accent); }
+
+/* MAIN APP */
+#app {
+  display: none;
+  flex-direction: column;
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+}
+
+/* TOPBAR */
+#topBar {
+  background: rgba(13,16,25,0.97);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border);
+  padding: 0 12px;
+  display: flex; align-items: center; gap: 8px;
+  height: 52px;
+  z-index: 10; position: relative;
+  flex-shrink: 0;
+}
+.light #topBar { background: rgba(255,255,255,0.97); }
+#lockTimerBar { position: absolute; bottom: 0; left: 0; height: 2px; background: linear-gradient(90deg, var(--accent), var(--accent2)); transition: width 1s linear; pointer-events: none; }
+
+.algo-pill { display: flex; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; flex-shrink: 0; }
+.algo-btn { padding: 6px 10px; font-family: var(--ff); font-size: 10px; font-weight: 700; letter-spacing: 1px; cursor: pointer; color: var(--muted); transition: all .2s; border: none; background: transparent; white-space: nowrap; text-transform: uppercase; }
+.algo-btn.active { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff; }
+
+.mode-pill { display: flex; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; flex-shrink: 0; }
+.mode-btn { padding: 7px 11px; font-family: var(--ff); font-size: 10px; font-weight: 700; letter-spacing: 1px; cursor: pointer; color: var(--muted); transition: all .2s; border: none; background: transparent; white-space: nowrap; }
+.mode-btn.active { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff; }
+
+.key-chip { display: flex; align-items: center; gap: 5px; background: var(--accent-dim); border: 1px solid rgba(0,229,200,0.16); border-radius: 8px; padding: 5px 9px; max-width: 80px; overflow: hidden; flex-shrink: 0; cursor: default; }
+.key-dot { width: 5px; height: 5px; background: var(--accent); border-radius: 50%; animation: blink 2s ease-in-out infinite; flex-shrink: 0; }
+@keyframes blink { 0%,100%{opacity:1;} 50%{opacity:.2;} }
+.key-chip-name { font-size: 10px; font-family: var(--fm); color: var(--accent); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+
+.icon-btn { width: 34px; height: 34px; border-radius: 10px; background: var(--surface); border: 1px solid var(--border); color: var(--text2); font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all .2s; }
+.icon-btn:active { border-color: var(--accent); color: var(--accent); }
+
+.bar-flex { flex: 1; }
+
+/* SEARCH BAR */
+#searchBar { padding: 8px 14px; border-bottom: 1px solid var(--border); display: none; background: var(--panel); flex-shrink: 0; }
+.search-wrap { display: flex; align-items: center; background: var(--surface); border: 1.5px solid var(--border); border-radius: 12px; padding: 0 12px; gap: 8px; transition: border-color var(--tr); }
+.search-wrap:focus-within { border-color: var(--accent2); }
+#searchInput { flex: 1; background: transparent; border: none; outline: none; color: var(--text); font-family: var(--fm); font-size: 13px; padding: 10px 0; }
+#searchInput::placeholder { color: var(--muted); }
+.search-close { color: var(--muted); font-size: 15px; cursor: pointer; padding: 4px; }
+
+/* CHAT */
+#chat {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 16px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+#chat::-webkit-scrollbar { width: 3px; }
+#chat::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+.empty-state { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; }
+.empty-icon { font-size: 42px; animation: lockFloat 3s ease-in-out infinite; }
+.empty-title { font-family: var(--ff); font-size: 16px; font-weight: 700; color: var(--text2); }
+.empty-pills { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 4px; }
+.empty-pill { padding: 5px 12px; border: 1px solid var(--border2); border-radius: 100px; font-family: var(--ff); font-size: 11px; color: var(--muted); }
+.empty-sub { font-size: 12px; color: var(--muted); text-align: center; line-height: 2; font-family: var(--ff); }
+
+.msg-pair { display: flex; flex-direction: column; gap: 8px; animation: fadeUp .25s ease; position: relative; }
+.msg-pair.hidden { display: none; }
+.msg-wrap { display: flex; flex-direction: column; gap: 4px; }
+.msg-wrap.right { align-items: flex-end; }
+.msg-wrap.left  { align-items: flex-start; }
+
+.msg-meta { display: flex; align-items: center; gap: 6px; padding: 0 4px; flex-wrap: wrap; }
+.msg-tag { font-size: 9px; font-family: var(--ff); font-weight: 700; letter-spacing: 2.5px; text-transform: uppercase; color: var(--muted); }
+.msg-time { font-size: 9px; color: var(--muted); opacity: .6; font-family: var(--fm); }
+.msg-keyname { font-size: 9px; font-family: var(--ff); background: var(--accent-dim); color: var(--accent); border-radius: 4px; padding: 1px 6px; border: 1px solid rgba(0,229,200,0.12); font-weight: 700; }
+.algo-badge { font-size: 8px; font-family: var(--ff); background: var(--accent2-dim); color: var(--accent2); border-radius: 4px; padding: 1px 6px; border: 1px solid rgba(123,92,246,0.15); font-weight: 700; letter-spacing: 1px; }
+
+.msg { padding: 12px 15px; border-radius: 16px; max-width: 90%; word-break: break-all; font-family: var(--fm); font-size: 13px; line-height: 1.7; cursor: pointer; transition: transform .1s, opacity .2s; position: relative; overflow: hidden; }
+.msg:active { transform: scale(0.98); }
+.msg.right { background: var(--surface2); border: 1px solid var(--border); border-bottom-right-radius: 4px; color: var(--text); }
+.msg.left  { background: var(--accent-dim); border: 1px solid rgba(0,229,200,0.15); border-bottom-left-radius: 4px; color: var(--accent); font-weight: 500; }
+.msg.aes-left { background: var(--accent2-dim); border-color: rgba(123,92,246,0.15); color: var(--accent2); }
+.msg.copied { opacity: .7; }
+.msg-flash { position: absolute; inset: 0; background: rgba(0,229,200,0.12); animation: flash .4s ease; border-radius: inherit; pointer-events: none; }
+@keyframes flash { 0%{opacity:1;} 100%{opacity:0;} }
+
+.char-count { font-size: 9px; color: var(--muted); text-align: right; padding: 0 4px; font-family: var(--fm); }
+
+.msg-actions { display: flex; gap: 5px; flex-wrap: wrap; padding: 0 2px; }
+.act-btn { padding: 4px 10px; border: 1px solid var(--border); border-radius: 100px; background: transparent; color: var(--text2); font-family: var(--ff); font-size: 10px; font-weight: 700; cursor: pointer; transition: all .15s; letter-spacing: .5px; }
+.act-btn:active { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+.act-btn.starred-btn { border-color: var(--gold); color: var(--gold); background: var(--gold-dim); }
+.act-btn.del-btn:active { border-color: var(--danger); color: var(--danger); background: var(--danger-dim); }
+
+/* INPUT BAR — no box-shadow */
+#inputBar {
+  padding: 10px 14px 14px;
+  background: rgba(13,16,25,0.97);
+  backdrop-filter: blur(20px);
+  border-top: 1px solid var(--border);
+  z-index: 10;
+  position: relative;
+  flex-shrink: 0;
+}
+.light #inputBar { background: rgba(255,255,255,0.97); }
+
+.input-outer { display: flex; align-items: flex-end; gap: 10px; }
+
+.composer {
+  flex: 1;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 20px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: border-color var(--tr);
+  /* No box-shadow at all */
+}
+.composer:focus-within { border-color: var(--accent); }
+
+.composer-header { display: flex; align-items: center; gap: 8px; padding: 8px 14px 0; }
+.mode-chip { font-size: 8px; font-family: var(--ff); font-weight: 800; letter-spacing: 2.5px; color: var(--accent); background: var(--accent-dim); border: 1px solid rgba(0,229,200,0.2); border-radius: 6px; padding: 3px 9px; white-space: nowrap; flex-shrink: 0; text-transform: uppercase; }
+.algo-chip { font-size: 8px; font-family: var(--ff); font-weight: 800; letter-spacing: 1.5px; color: var(--accent2); background: var(--accent2-dim); border: 1px solid rgba(123,92,246,0.2); border-radius: 6px; padding: 3px 9px; white-space: nowrap; flex-shrink: 0; text-transform: uppercase; }
+
+#msgInput {
+  display: block;
+  width: 100%;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text);
+  -webkit-text-fill-color: var(--text);
+  caret-color: var(--accent);
+  font-family: var(--fm);
+  font-size: 14px;
+  resize: none;
+  max-height: 110px;
+  overflow-y: auto;
+  line-height: 1.6;
+  padding: 8px 14px 6px;
+  -webkit-appearance: none;
+}
+#msgInput::placeholder { color: var(--muted); -webkit-text-fill-color: var(--muted); }
+
+.composer-footer { display: flex; align-items: center; justify-content: space-between; padding: 4px 14px 8px; border-top: 1px solid var(--border); margin-top: 2px; }
+.char-counter { font-size: 10px; color: var(--muted); font-family: var(--fm); }
+.char-counter.warn { color: var(--gold); }
+.key-footer-label { font-size: 9px; font-family: var(--ff); color: var(--text2); display: flex; align-items: center; gap: 4px; font-weight: 600; letter-spacing: .5px; }
+.key-footer-dot { width: 4px; height: 4px; background: var(--accent); border-radius: 50%; animation: blink 2s ease-in-out infinite; }
+
+.send-btn {
+  width: 48px; height: 48px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  border: none; color: #fff; font-size: 17px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: transform .15s, opacity .2s;
+  flex-shrink: 0;
+  align-self: flex-end;
+}
+.send-btn:active { transform: scale(0.88); }
+
+/* ══════════════════════════════════════════
+   DRAWER — Redesigned
+══════════════════════════════════════════ */
+#drawer {
+  position: fixed; top: 0; left: 0; bottom: 0;
+  width: 82vw; max-width: 300px;
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  z-index: 500;
+  transform: translateX(-100%);
+  transition: transform .3s cubic-bezier(0.16,1,0.3,1);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+#drawer.open { transform: translateX(0); }
+#drawerBackdrop { position: fixed; inset: 0; background: rgba(8,10,16,0.65); backdrop-filter: blur(4px); z-index: 499; display: none; }
+#drawerBackdrop.open { display: block; }
+
+/* Drawer Header */
+.drawer-header {
+  padding: 0;
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+}
+.drawer-header-bg {
+  background: linear-gradient(135deg, rgba(0,229,200,0.08) 0%, rgba(123,92,246,0.08) 100%);
+  border-bottom: 1px solid var(--border);
+  padding: 20px 18px 16px;
+  position: relative;
+}
+.drawer-header-bg::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--accent), var(--accent2), transparent);
+}
+.drawer-logo-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.drawer-logo-icon {
+  width: 36px; height: 36px;
+  background: linear-gradient(135deg, rgba(0,229,200,0.15), rgba(123,92,246,0.15));
+  border: 1px solid rgba(0,229,200,0.2);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+.drawer-brand { font-family: var(--ff); font-size: 16px; font-weight: 800; letter-spacing: 4px; text-transform: uppercase; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.drawer-user { font-size: 10px; color: var(--muted); font-family: var(--fm); letter-spacing: 1px; margin-top: 1px; }
+
+/* Active key display in drawer */
+.drawer-active-key {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--surface);
+  border: 1px solid rgba(0,229,200,0.18);
+  border-radius: 10px;
+  padding: 8px 12px;
+}
+.dak-dot { width: 6px; height: 6px; background: var(--accent); border-radius: 50%; animation: blink 2s ease-in-out infinite; flex-shrink: 0; }
+.dak-label { font-family: var(--ff); font-size: 9px; font-weight: 700; letter-spacing: 2px; color: var(--text2); text-transform: uppercase; flex-shrink: 0; }
+.dak-name { font-family: var(--fm); font-size: 12px; color: var(--accent); font-weight: 600; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dak-algo { font-family: var(--ff); font-size: 8px; font-weight: 800; letter-spacing: 1px; color: var(--accent2); background: var(--accent2-dim); border: 1px solid rgba(123,92,246,0.2); border-radius: 4px; padding: 2px 7px; flex-shrink: 0; }
+
+.drawer-dev { font-size: 9px; color: var(--muted); margin-top: 8px; font-family: var(--ff); letter-spacing: 1.5px; text-transform: uppercase; }
+.drawer-dev span { background: linear-gradient(90deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; font-weight: 700; }
+
+.drawer-body { flex: 1; overflow-y: auto; padding: 6px 0; -webkit-overflow-scrolling: touch; }
+
+/* Drawer section headers */
+.drawer-section {
+  font-size: 9px; font-family: var(--ff); font-weight: 800;
+  letter-spacing: 3px; color: var(--muted); text-transform: uppercase;
+  padding: 12px 18px 5px;
+  display: flex; align-items: center; gap: 8px;
+}
+.drawer-section::after {
+  content: ''; flex: 1; height: 1px; background: var(--border);
+}
+
+/* Drawer items */
+.drawer-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 16px;
+  cursor: pointer;
+  transition: background .15s;
+  font-family: var(--ff); font-size: 13px; font-weight: 600;
+  color: var(--text2);
+  position: relative;
+}
+.drawer-item:active { background: var(--surface); color: var(--text); }
+.di-icon-wrap {
+  width: 32px; height: 32px;
+  border-radius: 9px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px;
+  flex-shrink: 0;
+  transition: all .2s;
+}
+.drawer-item:active .di-icon-wrap { border-color: var(--accent); background: var(--accent-dim); }
+.di-text { flex: 1; }
+.di-badge {
+  background: var(--accent-dim); color: var(--accent);
+  border: 1px solid rgba(0,229,200,0.18);
+  border-radius: 100px; padding: 2px 9px;
+  font-size: 10px; font-weight: 800;
+  min-width: 26px; text-align: center;
+  font-family: var(--fm);
+}
+.di-badge.purple { background: var(--accent2-dim); color: var(--accent2); border-color: rgba(123,92,246,0.18); }
+.di-arrow { font-size: 10px; color: var(--muted); opacity: 0.5; }
+
+.drawer-sep { height: 1px; background: var(--border); margin: 4px 16px; }
+
+/* Key selector in drawer */
+.key-selector { padding: 0 10px; }
+.key-sel-item { display: flex; align-items: center; gap: 8px; padding: 9px 10px; border-radius: 10px; cursor: pointer; border: 1px solid transparent; margin-bottom: 4px; transition: all .15s; }
+.key-sel-item:active, .key-sel-item.active { background: var(--accent-dim); border-color: rgba(0,229,200,0.18); }
+.key-sel-name { font-family: var(--ff); font-size: 12px; font-weight: 700; color: var(--text); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.key-sel-val { font-family: var(--fm); font-size: 10px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 80px; }
+.key-sel-check { color: var(--accent); font-size: 14px; flex-shrink: 0; font-weight: 700; }
+.key-strength { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.ks-weak { background: var(--danger); }
+.ks-ok { background: var(--gold); }
+.ks-strong { background: var(--accent); }
+
+.key-add-row { display: flex; gap: 6px; margin-top: 8px; padding: 0 10px; }
+.key-add-inp { flex: 1; min-width: 0; padding: 9px 11px; background: var(--surface); border: 1.5px solid var(--border); border-radius: 10px; color: var(--text); font-family: var(--fm); font-size: 12px; outline: none; transition: border-color var(--tr); }
+.key-add-inp:focus { border-color: var(--accent); }
+.key-add-btn { padding: 9px 14px; background: linear-gradient(135deg, var(--accent), var(--accent2)); border: none; border-radius: 10px; color: #fff; font-family: var(--ff); font-weight: 800; font-size: 14px; cursor: pointer; flex-shrink: 0; }
+.key-gen-btn { width: calc(100% - 20px); margin: 6px 10px 0; padding: 8px 10px; border: 1px dashed var(--border2); border-radius: 8px; background: transparent; color: var(--text2); font-family: var(--ff); font-size: 11px; font-weight: 700; cursor: pointer; transition: all .2s; letter-spacing: .5px; }
+.key-gen-btn:active { border-color: var(--accent2); color: var(--accent2); }
+
+/* Drawer footer */
+.drawer-footer {
+  padding: 12px 16px 16px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+  display: flex; gap: 8px;
+}
+.drawer-logout {
+  flex: 1; padding: 11px 12px;
+  border: 1.5px solid var(--border);
+  border-radius: 12px; background: transparent;
+  color: var(--text2); font-family: var(--ff);
+  font-size: 12px; font-weight: 700;
+  cursor: pointer; transition: all .2s; letter-spacing: .5px;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+.drawer-logout:active { border-color: var(--danger); color: var(--danger); background: var(--danger-dim); }
+
+/* BOTTOM SHEETS */
+.bd { position: fixed; inset: 0; background: rgba(8,10,16,0.7); backdrop-filter: blur(5px); z-index: 200; display: none; }
+.bd.open { display: block; }
+.sheet { position: fixed; bottom: 0; left: 0; right: 0; background: var(--panel); border-top: 1px solid var(--border); border-radius: 22px 22px 0 0; z-index: 201; transform: translateY(100%); transition: transform .3s cubic-bezier(0.16,1,0.3,1); max-height: 80vh; display: flex; flex-direction: column; box-shadow: 0 -8px 40px rgba(0,0,0,.4); }
+.sheet.open { transform: translateY(0); }
+.sh-handle { width: 34px; height: 4px; background: var(--border2); border-radius: 2px; margin: 12px auto 0; flex-shrink: 0; }
+.sh-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px 12px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.sh-title { font-family: var(--ff); font-size: 15px; font-weight: 800; }
+.sh-close { width: 28px; height: 28px; border-radius: 8px; background: var(--surface); border: 1px solid var(--border); color: var(--text2); font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-family: var(--ff); font-weight: 700; }
+.sh-body { overflow-y: auto; padding: 14px 18px; flex: 1; -webkit-overflow-scrolling: touch; }
+
+.sh-search { margin-bottom: 12px; }
+.sh-search input { width: 100%; padding: 10px 14px; background: var(--surface); border: 1.5px solid var(--border); border-radius: 12px; color: var(--text); font-family: var(--fm); font-size: 13px; outline: none; transition: border-color var(--tr); }
+.sh-search input:focus { border-color: var(--accent2); }
+
+.hist-tabs { display: flex; gap: 6px; margin-bottom: 14px; }
+.hist-tab { padding: 6px 14px; border-radius: 100px; font-family: var(--ff); font-size: 11px; font-weight: 700; cursor: pointer; border: 1px solid var(--border); background: transparent; color: var(--muted); transition: all .15s; letter-spacing: .5px; }
+.hist-tab.active { background: var(--accent-dim); border-color: rgba(0,229,200,0.25); color: var(--accent); }
+
+/* ══════════════════════════════════════════
+   HISTORY & STARRED — Redesigned cards
+══════════════════════════════════════════ */
+.hist-item {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  margin-bottom: 10px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color .2s, transform .1s;
+}
+.hist-item:active { transform: scale(0.99); border-color: var(--accent); }
+.hist-item.starred-item { border-color: rgba(245,200,66,0.25); }
+
+/* Top bar of hist card */
+.hist-card-header {
+  display: flex; align-items: center; gap: 6px;
+  padding: 9px 12px 7px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface2);
+}
+.hist-mode-badge {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 9px; font-family: var(--ff); font-weight: 800;
+  letter-spacing: 2px; text-transform: uppercase;
+}
+.hist-mode-badge.enc { color: var(--accent); }
+.hist-mode-badge.dec { color: var(--accent2); }
+.hist-mode-dot {
+  width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+}
+.hist-mode-badge.enc .hist-mode-dot { background: var(--accent); box-shadow: 0 0 6px rgba(0,229,200,0.5); }
+.hist-mode-badge.dec .hist-mode-dot { background: var(--accent2); box-shadow: 0 0 6px rgba(123,92,246,0.5); }
+.hist-algo-badge { font-size: 8px; font-family: var(--ff); font-weight: 800; background: var(--accent2-dim); color: var(--accent2); border-radius: 4px; padding: 1px 6px; border: 1px solid rgba(123,92,246,0.15); }
+.hist-star-icon { font-size: 11px; }
+.hist-meta-right { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+.hist-key-tag { font-size: 9px; font-family: var(--ff); font-weight: 700; color: var(--text2); background: var(--accent-dim); border: 1px solid rgba(0,229,200,0.1); border-radius: 4px; padding: 1px 6px; display: flex; align-items: center; gap: 3px; }
+.hist-time { font-size: 9px; color: var(--muted); font-family: var(--fm); }
+
+/* Body of hist card */
+.hist-card-body { padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+
+.hist-row { display: flex; flex-direction: column; gap: 2px; }
+.hist-row-label {
+  font-size: 8px; font-family: var(--ff); font-weight: 800;
+  letter-spacing: 2px; text-transform: uppercase; color: var(--muted);
+}
+.hist-row-text {
+  font-family: var(--fm); font-size: 12px; line-height: 1.5;
+  overflow: hidden; text-overflow: ellipsis;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+}
+.hist-row-text.plain { color: var(--text2); }
+.hist-row-text.cipher { color: var(--accent); font-weight: 500; }
+.hist-row-text.cipher-aes { color: var(--accent2); }
+
+.hist-divider { height: 1px; background: var(--border); }
+
+/* Copy hint */
+.hist-copy-hint {
+  display: flex; align-items: center; justify-content: flex-end;
+  padding: 5px 12px 8px;
+  gap: 4px;
+}
+.hist-copy-hint span { font-size: 9px; font-family: var(--ff); color: var(--muted); letter-spacing: 1px; }
+
+/* Starred empty */
+.empty-msg { text-align: center; color: var(--muted); font-family: var(--ff); font-size: 13px; padding: 36px 0; font-weight: 600; line-height: 2; }
+
+/* SETTINGS */
+.sett-row { display: flex; align-items: center; justify-content: space-between; padding: 15px 0; border-bottom: 1px solid var(--border); }
+.sett-row:last-child { border-bottom: none; }
+.sett-label { font-family: var(--ff); font-size: 14px; font-weight: 700; color: var(--text); }
+.sett-sub { font-size: 11px; color: var(--muted); margin-top: 2px; font-family: var(--fm); }
+.toggle { width: 44px; height: 25px; background: var(--border); border-radius: 13px; position: relative; cursor: pointer; transition: background .2s; flex-shrink: 0; border: none; }
+.toggle.on { background: var(--accent); }
+.toggle::after { content: ''; position: absolute; width: 19px; height: 19px; background: #fff; border-radius: 50%; top: 3px; left: 3px; transition: transform .2s; box-shadow: 0 1px 4px rgba(0,0,0,.3); }
+.toggle.on::after { transform: translateX(19px); }
+.sett-btn { padding: 7px 14px; border: 1.5px solid var(--border2); border-radius: 8px; background: transparent; color: var(--text2); font-family: var(--ff); font-size: 11px; font-weight: 700; cursor: pointer; transition: all .2s; letter-spacing: .5px; }
+.sett-btn:active { border-color: var(--accent2); color: var(--accent2); }
+.sett-btn.red:active { border-color: var(--danger); color: var(--danger); }
+
+.change-pw { display: none; flex-direction: column; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.change-pw .field-input { font-size: 14px; padding: 12px 14px; }
+.change-pw-section { font-size: 9px; font-family: var(--ff); font-weight: 800; letter-spacing: 2px; color: var(--text2); text-transform: uppercase; margin-top: 8px; margin-bottom: 2px; }
+.change-pw-divider { height: 1px; background: var(--border); margin: 6px 0; }
+
+/* QR SHEET */
+.qr-wrapper { display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 8px 0; }
+#qrCanvas { padding: 16px; background: #fff; border-radius: 16px; box-shadow: var(--shadow); }
+.qr-text { font-family: var(--fm); font-size: 11px; color: var(--text2); text-align: center; word-break: break-all; max-width: 260px; line-height: 1.7; background: var(--surface); padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border); }
+.qr-copy-btn { padding: 12px 28px; background: linear-gradient(135deg, var(--accent), var(--accent2)); border: none; border-radius: 12px; color: #fff; font-family: var(--ff); font-weight: 700; font-size: 13px; cursor: pointer; letter-spacing: 1px; }
+
+/* STATS */
+.stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+.stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px; text-align: center; }
+.stat-num { font-family: var(--ff); font-size: 24px; font-weight: 800; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.stat-label { font-family: var(--fm); font-size: 10px; color: var(--muted); margin-top: 3px; letter-spacing: 1px; }
+
+/* CONFIRM */
+#confirmDlg { position: fixed; inset: 0; background: rgba(8,10,16,0.85); backdrop-filter: blur(8px); z-index: 9998; display: none; align-items: center; justify-content: center; padding: 24px; }
+#confirmDlg.open { display: flex; }
+.confirm-box { background: var(--panel); border: 1px solid var(--border); border-radius: 22px; padding: 28px 24px; width: 100%; max-width: 300px; animation: popIn .25s ease; box-shadow: var(--shadow); }
+.confirm-icon  { font-size: 36px; text-align: center; margin-bottom: 12px; }
+.confirm-title { font-family: var(--ff); font-size: 16px; font-weight: 800; color: var(--text); text-align: center; margin-bottom: 8px; }
+.confirm-sub   { font-family: var(--fm); font-size: 12px; color: var(--text2); text-align: center; line-height: 1.7; margin-bottom: 24px; }
+.confirm-btns  { display: flex; gap: 10px; }
+.confirm-cancel { flex: 1; padding: 13px; border: 1.5px solid var(--border2); border-radius: 12px; background: transparent; color: var(--text2); font-family: var(--ff); font-weight: 700; font-size: 13px; cursor: pointer; }
+.confirm-ok     { flex: 1; padding: 13px; background: var(--danger); border: none; border-radius: 12px; color: #fff; font-family: var(--ff); font-weight: 800; font-size: 13px; cursor: pointer; }
+
+/* TOAST */
+#toast { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%) translateY(12px); background: var(--panel); border: 1px solid var(--border); color: var(--text); font-family: var(--ff); font-size: 12px; font-weight: 700; letter-spacing: .5px; padding: 10px 20px; border-radius: 100px; opacity: 0; transition: opacity .2s, transform .2s; pointer-events: none; z-index: 9999; white-space: nowrap; }
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+#toast.s { border-color: var(--accent);  color: var(--accent); }
+#toast.i { border-color: var(--accent2); color: var(--accent2); }
+#toast.e { border-color: var(--danger);  color: var(--danger); }
+#toast.g { border-color: var(--gold);    color: var(--gold); }
+
+select { background: var(--surface); border: 1px solid var(--border); color: var(--text); font-family: var(--ff); font-size: 12px; font-weight: 600; border-radius: 8px; padding: 7px 10px; outline: none; cursor: pointer; }
+</style>
+</head>
+<body>
+
+<div class="bg-layer">
+  <div class="bg-noise"></div>
+  <div class="bg-grid"></div>
+  <div class="bg-orb1"></div>
+  <div class="bg-orb2"></div>
+</div>
+
+<!-- LOCK SCREEN -->
+<div class="screen active" id="lockScreen">
+  <div class="brand">
+    <div class="brand-logo">
+      <svg class="lock-svg" viewBox="0 0 42 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path class="shackle" d="M10 22V14C10 8.477 14.477 4 21 4C27.523 4 32 8.477 32 14V22"/>
+        <rect class="body" x="5" y="22" width="32" height="22" rx="5"/>
+        <circle class="keyhole" cx="21" cy="32" r="3"/>
+        <rect class="keyhole" x="19.5" y="33" width="3" height="5" rx="1.5"/>
+      </svg>
+    </div>
+    <div class="brand-name">ASTRA</div>
+    <div class="brand-sub">End-to-end encryption</div>
+    <div class="brand-dev">Developed by <span>LETHÉ LABS</span></div>
+  </div>
+
+  <div id="pinMode" style="width:100%;max-width:300px;">
+    <div class="auth-card">
+      <div class="pin-label" id="pinModeLabel">Enter your PIN</div>
+      <div class="pin-dots" id="lockPinDots"></div>
+      <div class="pin-grid" id="lockPinGrid"></div>
+      <div class="auth-err" id="pinErr"></div>
+      <div class="auth-link" style="margin-top:10px">Use password? <span onclick="switchLockMode('pass')">Switch</span></div>
+    </div>
+  </div>
+
+  <div id="passMode" style="display:none;">
+    <div class="auth-card">
+      <span class="field-label">Password</span>
+      <div class="field-wrap">
+        <input class="field-input" type="password" id="lockPass" placeholder="Enter your password" autocomplete="current-password">
+        <span class="field-eye" onclick="toggleEye('lockPass',this)">👁</span>
+      </div>
+      <button class="auth-btn" id="lockBtn">UNLOCK</button>
+      <div class="auth-err" id="lockErr"></div>
+      <button class="bio-btn" id="bioBtn" style="display:none" onclick="tryBiometric()">☞ Use Biometric / Face ID</button>
+      <div class="auth-link" style="margin-top:10px">Use PIN? <span onclick="switchLockMode('pin')">Switch to PIN</span></div>
+      <div class="auth-link" style="margin-top:6px">First time? <span onclick="goToSignup()">Create account</span></div>
+    </div>
+  </div>
+
+  <div id="noPinLinks" style="display:none;">
+    <div class="auth-link" style="margin-top:10px">First time? <span onclick="goToSignup()">Create account</span></div>
+  </div>
+</div>
+
+<!-- SIGNUP SCREEN -->
+<div class="screen" id="signupScreen">
+  <div class="auth-back" onclick="goToLock()">← Back</div>
+  <div class="brand" style="margin-bottom:16px;">
+    <div class="brand-logo" style="width:64px;height:64px;">
+      <svg class="lock-svg" style="width:32px;height:36px;" viewBox="0 0 42 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path class="shackle" d="M10 22V14C10 8.477 14.477 4 21 4C27.523 4 32 8.477 32 14V22"/>
+        <rect class="body" x="5" y="22" width="32" height="22" rx="5"/>
+        <circle class="keyhole" cx="21" cy="32" r="3"/>
+        <rect class="keyhole" x="19.5" y="33" width="3" height="5" rx="1.5"/>
+      </svg>
+    </div>
+    <div class="brand-name" style="font-size:22px;letter-spacing:5px;">ASTRA</div>
+    <div class="brand-dev">Developed by <span>LETHÉ LABS</span></div>
+  </div>
+  <div class="auth-card">
+    <span class="field-label">Set Password</span>
+    <div class="field-wrap">
+      <input class="field-input" type="password" id="signPass1" placeholder="Min 4 characters" oninput="checkPwStrength(this.value)" autocomplete="new-password">
+      <span class="field-eye" onclick="toggleEye('signPass1',this)">👁</span>
+    </div>
+    <div class="pw-strength"><div class="pw-strength-bar" id="strengthBar"></div></div>
+    <span class="field-label">Confirm Password</span>
+    <div class="field-wrap">
+      <input class="field-input" type="password" id="signPass2" placeholder="Repeat password" autocomplete="new-password">
+      <span class="field-eye" onclick="toggleEye('signPass2',this)">👁</span>
+    </div>
+    <span class="field-label" style="margin-top:2px;">PIN <span style="color:var(--muted);font-size:9px;">(optional · 4–16 digits)</span></span>
+    <div class="field-wrap">
+      <input class="field-input" type="tel" id="signPin" placeholder="4 to 16 digits" maxlength="16" inputmode="numeric" pattern="[0-9]*" style="letter-spacing:4px;" oninput="this.value=this.value.replace(/[^0-9]/g,'')">
+    </div>
+    <button class="auth-btn" id="signBtn">CREATE ACCOUNT</button>
+    <div class="auth-err" id="signErr"></div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app">
+  <div id="topBar">
+    <div id="lockTimerBar" style="width:100%;"></div>
+    <div class="algo-pill">
+      <button class="algo-btn active" id="algoSubst"  onclick="setAlgo('subst',this)"  title="Substitution cipher">SUB</button>
+      <button class="algo-btn"        id="algoCaesar" onclick="setAlgo('caesar',this)" title="Caesar cipher">ROT</button>
+      <button class="algo-btn"        id="algoAES"    onclick="setAlgo('aes',this)"    title="AES-256-GCM">AES</button>
+    </div>
+    <div class="mode-pill">
+      <button class="mode-btn active" id="encBtn">↑ ENC</button>
+      <button class="mode-btn"        id="decBtn">↓ DEC</button>
+    </div>
+    <div class="bar-flex"></div>
+    <div class="key-chip">
+      <div class="key-dot"></div>
+      <span class="key-chip-name" id="keyLabel">default key</span>
+    </div>
+    <button class="icon-btn" onclick="openDrawer()">☰</button>
+  </div>
+
+  <div id="searchBar">
+    <div class="search-wrap">
+      <span style="color:var(--muted);font-size:13px">🔍</span>
+      <input id="searchInput" placeholder="Search messages…">
+      <span class="search-close" onclick="closeSearch()">✕</span>
+    </div>
+  </div>
+
+  <div id="chat">
+    <div class="empty-state" id="emptyState">
+      <div class="empty-icon">🔒</div>
+      <div class="empty-title">Ready to encrypt</div>
+      <div class="empty-pills">
+        <span class="empty-pill">SUB cipher</span>
+        <span class="empty-pill">ROT-N cipher</span>
+        <span class="empty-pill">AES-256-GCM</span>
+      </div>
+      <div class="empty-sub">Type below · Pick algorithm in top bar<br>Open ☰ to manage keys &amp; settings</div>
+    </div>
+  </div>
+
+  <div id="inputBar">
+    <div class="input-outer">
+      <div class="composer" id="composerBox">
+        <div class="composer-header">
+          <span class="mode-chip" id="modeChip">ENCRYPT</span>
+          <span class="algo-chip" id="algoChip">SUB</span>
+        </div>
+        <textarea id="msgInput" placeholder="Type your message…" rows="1" oninput="onInputChange(this)"></textarea>
+        <div class="composer-footer">
+          <span class="char-counter" id="charCounter">0 chars</span>
+          <span class="key-footer-label">
+            <span class="key-footer-dot"></span>
+            <span id="keyFooterName">Default Key</span>
+          </span>
+        </div>
+      </div>
+      <button class="send-btn" onclick="sendMsg()">➤</button>
+    </div>
+  </div>
+</div>
+
+<!-- DRAWER -->
+<div id="drawerBackdrop" onclick="closeDrawer()"></div>
+<div id="drawer">
+  <div class="drawer-header">
+    <div class="drawer-header-bg">
+      <div class="drawer-logo-row">
+        <div class="drawer-logo-icon">🔐</div>
+        <div>
+          <div class="drawer-brand">ASTRA</div>
+          <div class="drawer-user">Secured with SHA-256</div>
+        </div>
+      </div>
+      <div class="drawer-active-key">
+        <div class="dak-dot"></div>
+        <div class="dak-label">Active Key</div>
+        <div class="dak-name" id="drawerActiveKeyName">Default Key</div>
+        <div class="dak-algo" id="drawerActiveAlgo">SUB</div>
+      </div>
+      <div class="drawer-dev" style="margin-top:10px;">Developed by <span>LETHÉ LABS</span></div>
+    </div>
+  </div>
+
+  <div class="drawer-body">
+    <div class="drawer-section">Actions</div>
+
+    <div class="drawer-item" onclick="openSheet('histSheet');closeDrawer()">
+      <div class="di-icon-wrap">📋</div>
+      <div class="di-text">History</div>
+      <span class="di-badge" id="histBadge">0</span>
+      <span class="di-arrow">›</span>
+    </div>
+    <div class="drawer-item" onclick="openSheet('starsSheet');closeDrawer()">
+      <div class="di-icon-wrap">⭐</div>
+      <div class="di-text">Starred</div>
+      <span class="di-badge purple" id="starBadge">0</span>
+      <span class="di-arrow">›</span>
+    </div>
+    <div class="drawer-item" onclick="openSheet('statsSheet');closeDrawer()">
+      <div class="di-icon-wrap">📊</div>
+      <div class="di-text">Statistics</div>
+      <span class="di-arrow">›</span>
+    </div>
+    <div class="drawer-item" onclick="toggleSearch();closeDrawer()">
+      <div class="di-icon-wrap">🔍</div>
+      <div class="di-text">Search Messages</div>
+      <span class="di-arrow">›</span>
+    </div>
+
+    <div class="drawer-sep"></div>
+    <div class="drawer-section">Cipher Keys</div>
+    <div class="key-selector" id="drawerKeys"></div>
+    <div style="margin-top:8px;">
+      <div style="font-family:var(--ff);font-size:9px;color:var(--muted);margin-bottom:6px;font-weight:800;letter-spacing:2px;padding:0 10px;text-transform:uppercase;">Add Key</div>
+      <div class="key-add-row">
+        <input class="key-add-inp" id="newKeyName" placeholder="Name">
+        <input class="key-add-inp" id="newKeyVal"  placeholder="Key value">
+        <button class="key-add-btn" onclick="addKey()">+</button>
+      </div>
+      <button class="key-gen-btn" onclick="genRandomKey()">⚡ Generate random key</button>
+    </div>
+
+    <div class="drawer-sep"></div>
+    <div class="drawer-section">Tools</div>
+    <div class="drawer-item" onclick="exportChat();closeDrawer()">
+      <div class="di-icon-wrap">📤</div>
+      <div class="di-text">Export History (.txt)</div>
+      <span class="di-arrow">›</span>
+    </div>
+    <div class="drawer-item" onclick="exportJSON();closeDrawer()">
+      <div class="di-icon-wrap">💾</div>
+      <div class="di-text">Export as JSON</div>
+      <span class="di-arrow">›</span>
+    </div>
+    <div class="drawer-item" onclick="openSheet('settSheet');closeDrawer()">
+      <div class="di-icon-wrap">⚙️</div>
+      <div class="di-text">Settings &amp; Security</div>
+      <span class="di-arrow">›</span>
+    </div>
+  </div>
+
+  <div class="drawer-footer">
+    <button class="drawer-logout" onclick="confirmLogout()">🚪 Lock &amp; Log Out</button>
+  </div>
+</div>
+
+<!-- SHEETS -->
+<div class="bd" id="shBd" onclick="closeAllSheets()"></div>
+
+<!-- History -->
+<div class="sheet" id="histSheet">
+  <div class="sh-handle"></div>
+  <div class="sh-head"><div class="sh-title">📋 History</div><button class="sh-close" onclick="closeAllSheets()">✕</button></div>
+  <div class="sh-body">
+    <div class="sh-search"><input id="histSearch" placeholder="Search history…" oninput="filterHistory()"></div>
+    <div class="hist-tabs">
+      <button class="hist-tab active" onclick="setHistTab('all',this)">All</button>
+      <button class="hist-tab" onclick="setHistTab('encode',this)">Encrypted</button>
+      <button class="hist-tab" onclick="setHistTab('decode',this)">Decrypted</button>
+    </div>
+    <div id="histList"></div>
+  </div>
+</div>
+
+<!-- Starred -->
+<div class="sheet" id="starsSheet">
+  <div class="sh-handle"></div>
+  <div class="sh-head"><div class="sh-title">⭐ Starred</div><button class="sh-close" onclick="closeAllSheets()">✕</button></div>
+  <div class="sh-body" id="starsList"></div>
+</div>
+
+<!-- Stats -->
+<div class="sheet" id="statsSheet">
+  <div class="sh-handle"></div>
+  <div class="sh-head"><div class="sh-title">📊 Statistics</div><button class="sh-close" onclick="closeAllSheets()">✕</button></div>
+  <div class="sh-body" id="statsBody"></div>
+</div>
+
+<!-- QR -->
+<div class="sheet" id="qrSheet">
+  <div class="sh-handle"></div>
+  <div class="sh-head"><div class="sh-title">📱 Share via QR</div><button class="sh-close" onclick="closeAllSheets()">✕</button></div>
+  <div class="sh-body">
+    <div class="qr-wrapper">
+      <div id="qrCanvas"></div>
+      <div class="qr-text" id="qrText"></div>
+      <button class="qr-copy-btn" onclick="copyQRText()">⎘ Copy Encrypted Text</button>
+    </div>
+  </div>
+</div>
+
+<!-- Settings -->
+<div class="sheet" id="settSheet">
+  <div class="sh-handle"></div>
+  <div class="sh-head"><div class="sh-title">⚙️ Settings</div><button class="sh-close" onclick="closeAllSheets()">✕</button></div>
+  <div class="sh-body">
+    <div class="sett-row">
+      <div><div class="sett-label">Light Theme</div><div class="sett-sub">Toggle dark / light mode</div></div>
+      <button class="toggle" id="themeToggle" onclick="toggleTheme()"></button>
+    </div>
+    <div class="sett-row">
+      <div><div class="sett-label">Auto-Lock</div><div class="sett-sub">Lock after inactivity</div></div>
+      <select id="autoLockSel" onchange="saveAutoLock()">
+        <option value="0">Off</option>
+        <option value="1">1 min</option>
+        <option value="2" selected>2 min</option>
+        <option value="5">5 min</option>
+        <option value="10">10 min</option>
+      </select>
+    </div>
+    <div class="sett-row">
+      <div><div class="sett-label">Default Algorithm</div><div class="sett-sub">Pre-select cipher on launch</div></div>
+      <select id="defaultAlgoSel" onchange="saveDefaultAlgo()">
+        <option value="subst">Substitution</option>
+        <option value="caesar">Caesar / ROT</option>
+        <option value="aes">AES-256-GCM</option>
+      </select>
+    </div>
+    <div class="sett-row">
+      <div><div class="sett-label">Caesar Shift</div><div class="sett-sub">ROT value (1-25)</div></div>
+      <input type="number" min="1" max="25" id="caesarShift" value="13" style="width:60px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-family:var(--ff);font-size:13px;border-radius:8px;padding:6px 10px;outline:none;text-align:center;" onchange="saveCaesarShift()">
+    </div>
+    <div class="sett-row">
+      <div><div class="sett-label">Change Credentials</div><div class="sett-sub">Update password &amp; PIN</div></div>
+      <button class="sett-btn" onclick="toggleChangePw()">CHANGE</button>
+    </div>
+    <div class="change-pw" id="changePwForm">
+      <div class="change-pw-section">🔐 Password</div>
+      <input class="field-input" type="password" id="currPass"  placeholder="Current password">
+      <input class="field-input" type="password" id="newPass1"  placeholder="New password (min 4 chars)" oninput="checkPwStrength(this.value,'strengthBar2')">
+      <div class="pw-strength"><div class="pw-strength-bar" id="strengthBar2"></div></div>
+      <input class="field-input" type="password" id="newPass2"  placeholder="Confirm new password">
+      <div class="change-pw-divider"></div>
+      <div class="change-pw-section">🔢 PIN <span style="color:var(--muted);font-size:9px;font-weight:400;letter-spacing:0;">(optional · 4–16 digits · leave blank to keep current)</span></div>
+      <input class="field-input" type="tel" id="newPin" placeholder="New PIN (4–16 digits, optional)" maxlength="16" inputmode="numeric" pattern="[0-9]*" style="letter-spacing:3px;" oninput="this.value=this.value.replace(/[^0-9]/g,'')">
+      <input class="field-input" type="tel" id="newPinConfirm" placeholder="Confirm new PIN" maxlength="16" inputmode="numeric" pattern="[0-9]*" style="letter-spacing:3px;" oninput="this.value=this.value.replace(/[^0-9]/g,'')">
+      <button class="auth-btn" onclick="changeCredentials()">UPDATE CREDENTIALS</button>
+      <div class="auth-err" id="changePwErr"></div>
+    </div>
+    <div class="sett-row">
+      <div><div class="sett-label">Export History</div><div class="sett-sub">Download as .txt file</div></div>
+      <button class="sett-btn" onclick="exportChat()">EXPORT</button>
+    </div>
+    <div class="sett-row">
+      <div><div class="sett-label">Clear All History</div><div class="sett-sub">Permanently delete chat</div></div>
+      <button class="sett-btn red" onclick="confirmClear()">CLEAR</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm -->
+<div id="confirmDlg">
+  <div class="confirm-box">
+    <div class="confirm-icon"  id="confirmIcon">⚠️</div>
+    <div class="confirm-title" id="confirmTitle">Are you sure?</div>
+    <div class="confirm-sub"   id="confirmSub">This cannot be undone.</div>
+    <div class="confirm-btns">
+      <button class="confirm-cancel" onclick="closeConfirm()">Cancel</button>
+      <button class="confirm-ok" id="confirmOk">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════
+//  STORAGE UTIL
+// ══════════════════════════════════════════
+const S = {
+  get: k => { try{ return JSON.parse(localStorage.getItem(k)); } catch{ return null; } },
+  set: (k,v) => localStorage.setItem(k, JSON.stringify(v)),
+  del: k => localStorage.removeItem(k)
+};
+
+async function hashStr(s) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
+  return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+function randHex(n) {
+  const arr = new Uint8Array(n);
+  crypto.getRandomValues(arr);
+  return [...arr].map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+// ══════════════════════════════════════════
+//  AES-256-GCM
+// ══════════════════════════════════════════
+async function deriveKey(passphrase) {
+  const enc = new TextEncoder();
+  const km = await crypto.subtle.importKey('raw', enc.encode(passphrase), {name:'PBKDF2'}, false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    { name:'PBKDF2', salt: enc.encode('ASTRA-salt-v1'), iterations:100000, hash:'SHA-256' },
+    km, { name:'AES-GCM', length:256 }, false, ['encrypt','decrypt']
+  );
+}
+async function aesEncrypt(text, passphrase) {
+  const key = await deriveKey(passphrase);
+  const iv  = crypto.getRandomValues(new Uint8Array(12));
+  const enc = new TextEncoder();
+  const buf = await crypto.subtle.encrypt({name:'AES-GCM', iv}, key, enc.encode(text));
+  const combined = new Uint8Array(iv.byteLength + buf.byteLength);
+  combined.set(iv, 0); combined.set(new Uint8Array(buf), iv.byteLength);
+  return btoa(String.fromCharCode(...combined));
+}
+async function aesDecrypt(b64, passphrase) {
+  try {
+    const combined = new Uint8Array([...atob(b64)].map(c=>c.charCodeAt(0)));
+    const iv = combined.slice(0,12), data = combined.slice(12);
+    const key = await deriveKey(passphrase);
+    const dec = await crypto.subtle.decrypt({name:'AES-GCM', iv}, key, data);
+    return new TextDecoder().decode(dec);
+  } catch { return '⚠ Decryption failed — wrong key or corrupted data'; }
+}
+
+// ══════════════════════════════════════════
+//  SUBSTITUTION CIPHER
+// ══════════════════════════════════════════
+const CHARS = `ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789@#_&-+()/*"':;!?,.~|•√π÷×§∆\\}{=°^¢$¥€%©®™✓[]><`;
+function seededRand(seed) {
+  let v=0; for(let i=0;i<seed.length;i++) v=(v*31+seed.charCodeAt(i))%2147483647;
+  return()=>{v=(v*48271)%2147483647;return v/2147483647;};
+}
+function genMap(key) {
+  const arr=CHARS.split(''), rand=seededRand(key);
+  for(let i=arr.length-1;i>0;i--){const j=Math.floor(rand()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]];}
+  return arr;
+}
+function substEncrypt(t,k){const m=genMap(k);return[...t].map(c=>{const i=CHARS.indexOf(c);return i===-1?c:m[i];}).join('');}
+function substDecrypt(t,k){const m=genMap(k);return[...t].map(c=>{const i=m.indexOf(c);return i===-1?c:CHARS[i];}).join('');}
+
+// ══════════════════════════════════════════
+//  CAESAR / ROT
+// ══════════════════════════════════════════
+function caesarEncrypt(t, shift) {
+  shift=((shift%26)+26)%26;
+  return[...t].map(c=>{
+    if(c>='A'&&c<='Z') return String.fromCharCode((c.charCodeAt(0)-65+shift)%26+65);
+    if(c>='a'&&c<='z') return String.fromCharCode((c.charCodeAt(0)-97+shift)%26+97);
+    return c;
+  }).join('');
+}
+function caesarDecrypt(t, shift) { return caesarEncrypt(t, 26-shift); }
+
+// ══════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════
+let PW_HASH      = S.get('te_pwh')   || null;
+let PIN_HASH     = S.get('te_pinh')  || null;
+let PIN_LEN      = S.get('te_pinlen')|| 4;
+let savedKeys    = S.get('te_keys')  || [{name:'Default Key', val:'0000'}];
+let activeKey    = savedKeys[0].val;
+let activeKeyName= savedKeys[0].name;
+let mode         = 'encode';
+let algo         = S.get('te_algo')  || 'subst';
+let caesarShift  = S.get('te_shift') || 13;
+let history      = S.get('te_hist')  || [];
+let starred      = S.get('te_star')  || [];
+let lightMode    = S.get('te_light') || false;
+let autoLockMins = S.get('te_lock')  ?? 2;
+let histTab      = 'all';
+let lockMode     = PIN_HASH ? 'pin' : 'pass';
+let pinBuffer    = '';
+let lockTimer, lockRemaining, lockTotal;
+let qrCurrentText = '';
+
+if (lightMode) { document.body.classList.add('light'); document.getElementById('themeToggle').classList.add('on'); }
+document.getElementById('autoLockSel').value    = autoLockMins;
+document.getElementById('caesarShift').value    = caesarShift;
+document.getElementById('defaultAlgoSel').value = algo;
+setAlgoSilent(algo);
+
+// ══════════════════════════════════════════
+//  MOBILE VIEWPORT FIX
+// ══════════════════════════════════════════
+function setupViewportFix() {
+  const app = document.getElementById('app');
+  if (!window.visualViewport) return;
+  const update = () => {
+    const vvh = window.visualViewport.height;
+    app.style.height = vvh + 'px';
+    const chat = document.getElementById('chat');
+    if (chat) setTimeout(() => { chat.scrollTop = chat.scrollHeight; }, 80);
+  };
+  window.visualViewport.addEventListener('resize', update);
+  window.visualViewport.addEventListener('scroll', update);
+}
+setupViewportFix();
+
+// ══════════════════════════════════════════
+//  SCREENS
+// ══════════════════════════════════════════
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  const el = document.getElementById(id);
+  if (el) el.classList.add('active');
+  document.getElementById('app').style.display = 'none';
+}
+function showApp() {
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  const app = document.getElementById('app');
+  app.style.display = 'flex';
+  if (window.visualViewport) app.style.height = window.visualViewport.height + 'px';
+  updateKeyBadge(); renderDrawerKeys(); updateBadges(); resetAutoLock(); renderHistory();
+}
+
+if (!PW_HASH) {
+  showScreen('signupScreen');
+} else {
+  showScreen('lockScreen');
+  if (PIN_HASH) switchLockMode('pin');
+  else          switchLockMode('pass');
+  checkBiometric();
+}
+
+// ══════════════════════════════════════════
+//  LOCK / UNLOCK
+// ══════════════════════════════════════════
+document.getElementById('lockBtn').onclick = doLogin;
+document.getElementById('lockPass').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
+
+async function doLogin() {
+  const val = document.getElementById('lockPass').value;
+  if (!val) return;
+  const h = await hashStr(val);
+  if (h === PW_HASH) {
+    document.getElementById('lockPass').value = '';
+    document.getElementById('lockErr').innerText = '';
+    showApp();
+  } else {
+    shakeErr('lockErr', '⚠ Wrong password');
+    document.getElementById('lockPass').value = '';
+  }
+}
+
+function shakeErr(id, msg) {
+  const el = document.getElementById(id);
+  el.innerText = msg;
+  el.classList.remove('shake'); void el.offsetHeight; el.classList.add('shake');
+}
+
+async function checkBiometric() {
+  if (window.PublicKeyCredential && await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable())
+    document.getElementById('bioBtn').style.display = 'flex';
+}
+function tryBiometric() { toast('Biometric not enrolled — use password','i'); }
+
+// ══════════════════════════════════════════
+//  PIN PAD
+// ══════════════════════════════════════════
+function buildPinDots(containerId, filledCount, isError) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = '';
+  const len = PIN_LEN || 4;
+  for (let i = 0; i < len; i++) {
+    const d = document.createElement('div');
+    d.className = 'pin-dot';
+    if (isError)               d.classList.add('error');
+    else if (i < filledCount)  d.classList.add('filled');
+    container.appendChild(d);
+  }
+}
+
+function buildPinPad(gridId, onKey) {
+  const grid = document.getElementById(gridId);
+  grid.innerHTML = '';
+  const keys = [1,2,3,4,5,6,7,8,9,'✓','0','⌫'];
+  keys.forEach(k => {
+    const btn = document.createElement('button');
+    if (k === '✓') {
+      btn.className = 'pin-key confirm-key disabled-key';
+      btn.id = gridId + '_confirm';
+      btn.onclick = () => onKey('CONFIRM');
+    } else {
+      btn.className = 'pin-key';
+      btn.onclick = () => onKey(String(k));
+    }
+    btn.innerText = k;
+    grid.appendChild(btn);
+  });
+}
+
+function updateConfirmBtn(gridId, len) {
+  const btn = document.getElementById(gridId + '_confirm');
+  if (!btn) return;
+  if (len >= 4) btn.classList.remove('disabled-key');
+  else          btn.classList.add('disabled-key');
+}
+
+function switchLockMode(m) {
+  lockMode = m;
+  document.getElementById('passMode').style.display = m === 'pass' ? 'block' : 'none';
+  document.getElementById('pinMode').style.display  = m === 'pin'  ? 'block' : 'none';
+
+  const noPinLinks = document.getElementById('noPinLinks');
+  if (noPinLinks) noPinLinks.style.display = (!PW_HASH && m === 'pin') ? 'block' : 'none';
+
+  if (m === 'pin') {
+    pinBuffer = '';
+    buildPinDots('lockPinDots', 0, false);
+    buildPinPad('lockPinGrid', handleLockPin);
+    const lbl = document.getElementById('pinModeLabel');
+    if (lbl) lbl.innerText = PIN_LEN > 4 ? `Enter your ${PIN_LEN}-digit PIN` : 'Enter your PIN';
+  }
+}
+
+async function handleLockPin(k) {
+  if (k === '⌫') {
+    pinBuffer = pinBuffer.slice(0, -1);
+  } else if (k === 'CONFIRM') {
+    if (pinBuffer.length < 4) return;
+    await submitPin();
+    return;
+  } else {
+    if (pinBuffer.length >= PIN_LEN) return;
+    pinBuffer += k;
+  }
+
+  buildPinDots('lockPinDots', pinBuffer.length, false);
+  updateConfirmBtn('lockPinGrid', pinBuffer.length);
+
+  if (pinBuffer.length === PIN_LEN) {
+    await submitPin();
+  }
+}
+
+async function submitPin() {
+  const h = await hashStr(pinBuffer);
+  if (h === PIN_HASH) {
+    pinBuffer = '';
+    buildPinDots('lockPinDots', 0, false);
+    showApp();
+  } else {
+    buildPinDots('lockPinDots', PIN_LEN, true);
+    setTimeout(() => {
+      pinBuffer = '';
+      buildPinDots('lockPinDots', 0, false);
+      updateConfirmBtn('lockPinGrid', 0);
+    }, 700);
+    shakeErr('pinErr', 'Wrong PIN');
+  }
+}
+
+// ══════════════════════════════════════════
+//  SIGNUP
+// ══════════════════════════════════════════
+document.getElementById('signBtn').onclick = doSignup;
+
+async function doSignup() {
+  const p1  = document.getElementById('signPass1').value;
+  const p2  = document.getElementById('signPass2').value;
+  const pin = document.getElementById('signPin').value;
+  const err = document.getElementById('signErr');
+
+  if (p1.length < 4) { err.innerText = '⚠ Password min 4 chars'; return; }
+  if (p1 !== p2)     { err.innerText = '⚠ Passwords do not match'; return; }
+  if (pin && (pin.length < 4 || pin.length > 16 || isNaN(pin))) {
+    err.innerText = '⚠ PIN must be 4–16 digits'; return;
+  }
+
+  S.del('te_keys'); S.del('te_hist'); S.del('te_star');
+  savedKeys    = [{ name: 'Default Key', val: '0000' }];
+  activeKey    = savedKeys[0].val;
+  activeKeyName= savedKeys[0].name;
+  history      = [];
+  starred      = [];
+  S.set('te_keys', savedKeys);
+
+  PW_HASH = await hashStr(p1);
+  S.set('te_pwh', PW_HASH);
+
+  if (pin) {
+    PIN_HASH = await hashStr(pin);
+    PIN_LEN  = pin.length;
+    S.set('te_pinh',  PIN_HASH);
+    S.set('te_pinlen', PIN_LEN);
+    lockMode = 'pin';
+  } else {
+    PIN_HASH = null;
+    PIN_LEN  = 4;
+    S.del('te_pinh');
+    S.del('te_pinlen');
+    lockMode = 'pass';
+  }
+
+  ['signPass1','signPass2','signPin'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('signErr').innerText = '';
+  showApp();
+  toast('Account created! 🎉', 's');
+}
+
+function goToSignup() { document.getElementById('signErr').innerText = ''; showScreen('signupScreen'); }
+function goToLock()   { showScreen('lockScreen'); }
+function toggleEye(id, el) { const inp = document.getElementById(id); inp.type = inp.type === 'password' ? 'text' : 'password'; }
+
+function checkPwStrength(val, barId='strengthBar') {
+  const bar = document.getElementById(barId); if (!bar) return;
+  let s = 0;
+  if (val.length >= 4) s++; if (val.length >= 8) s++;
+  if (/[A-Z]/.test(val) && /[a-z]/.test(val)) s++;
+  if (/[0-9]/.test(val)) s++; if (/[^A-Za-z0-9]/.test(val)) s++;
+  bar.style.width = ([0,20,40,60,80,100][s]) + '%';
+  bar.style.background = ['transparent','#ff4571','#ff7043','#f5c842','#00e5c8','#7b5cf6'][s];
+}
+
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') lockApp(true); });
+function lockApp(silent) {
+  clearAutoLock(); closeDrawer(); closeAllSheets();
+  showScreen('lockScreen');
+  if (PIN_HASH) switchLockMode('pin');
+  else          switchLockMode('pass');
+  document.getElementById('lockPass').value = '';
+  document.getElementById('lockErr').innerText = '';
+  pinBuffer = '';
+  if (!silent) toast('Locked 🔒', 'i');
+}
+function confirmLogout() {
+  showConfirm('Lock & Log Out?', 'You will need your password to return.', '🔒', () => lockApp(false));
+}
+
+// ══════════════════════════════════════════
+//  AUTO-LOCK
+// ══════════════════════════════════════════
+function resetAutoLock() {
+  clearAutoLock();
+  if (!autoLockMins) return;
+  lockTotal = autoLockMins * 60; lockRemaining = lockTotal;
+  const bar = document.getElementById('lockTimerBar');
+  bar.style.width = '100%'; bar.style.transition = 'none';
+  lockTimer = setInterval(() => {
+    lockRemaining--;
+    bar.style.transition = 'width 1s linear';
+    bar.style.width = ((lockRemaining / lockTotal) * 100) + '%';
+    if (lockRemaining <= 0) lockApp(false);
+  }, 1000);
+}
+function clearAutoLock() {
+  clearInterval(lockTimer);
+  const bar = document.getElementById('lockTimerBar');
+  if (bar) { bar.style.width = '0%'; }
+}
+function saveAutoLock() {
+  autoLockMins = parseInt(document.getElementById('autoLockSel').value);
+  S.set('te_lock', autoLockMins); resetAutoLock(); toast('Auto-lock updated', 's');
+}
+['touchstart','keydown','click'].forEach(ev =>
+  document.getElementById('app')?.addEventListener(ev, () => { if (autoLockMins) resetAutoLock(); }, {passive:true})
+);
+
+// ══════════════════════════════════════════
+//  ALGORITHM
+// ══════════════════════════════════════════
+function setAlgo(a, btn) {
+  algo = a; S.set('te_algo', a);
+  document.querySelectorAll('.algo-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const labels = {subst:'SUB', caesar:'ROT', aes:'AES'};
+  document.getElementById('algoChip').innerText = labels[a];
+  updateDrawerAlgo();
+  toast('Algorithm: ' + (a==='subst'?'Substitution':a==='caesar'?'Caesar/ROT':'AES-256-GCM'), 'i');
+}
+function setAlgoSilent(a) {
+  algo = a;
+  const map = {subst:'algoSubst', caesar:'algoCaesar', aes:'algoAES'};
+  document.querySelectorAll('.algo-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(map[a])?.classList.add('active');
+  const labels = {subst:'SUB', caesar:'ROT', aes:'AES'};
+  const chip = document.getElementById('algoChip');
+  if (chip) chip.innerText = labels[a];
+  updateDrawerAlgo();
+}
+function updateDrawerAlgo() {
+  const labels = {subst:'SUB', caesar:'ROT', aes:'AES'};
+  const el = document.getElementById('drawerActiveAlgo');
+  if (el) el.innerText = labels[algo] || 'SUB';
+}
+function saveDefaultAlgo() {
+  const v = document.getElementById('defaultAlgoSel').value;
+  S.set('te_algo', v); setAlgoSilent(v); toast('Default algorithm saved', 's');
+}
+function saveCaesarShift() {
+  caesarShift = parseInt(document.getElementById('caesarShift').value) || 13;
+  S.set('te_shift', caesarShift); toast('Caesar shift: ' + caesarShift, 's');
+}
+
+// ══════════════════════════════════════════
+//  KEYS
+// ══════════════════════════════════════════
+function keyStrength(v) { return v.length < 5 ? 'weak' : v.length < 12 ? 'ok' : 'strong'; }
+function addKey() {
+  const name = document.getElementById('newKeyName').value.trim();
+  const val  = document.getElementById('newKeyVal').value.trim();
+  if (!name || !val) { toast('Enter name and key value', 'e'); return; }
+  savedKeys.push({name, val}); S.set('te_keys', savedKeys); renderDrawerKeys();
+  document.getElementById('newKeyName').value = '';
+  document.getElementById('newKeyVal').value  = '';
+  toast('Key saved ✓', 's');
+}
+function genRandomKey() {
+  document.getElementById('newKeyVal').value = randHex(16);
+  document.getElementById('newKeyName').focus(); toast('Random key generated', 'g');
+}
+function selectKey(i) {
+  activeKey = savedKeys[i].val; activeKeyName = savedKeys[i].name;
+  updateKeyBadge(); renderDrawerKeys(); toast('Key: ' + savedKeys[i].name, 's');
+}
+function deleteKey(i, e) {
+  e.stopPropagation();
+  if (savedKeys.length === 1) { toast('Need at least 1 key', 'e'); return; }
+  if (activeKey === savedKeys[i].val) { activeKey = savedKeys[0].val; activeKeyName = savedKeys[0].name; }
+  savedKeys.splice(i, 1); S.set('te_keys', savedKeys); renderDrawerKeys(); updateKeyBadge(); toast('Key removed', 'i');
+}
+function updateKeyBadge() {
+  const lbl = document.getElementById('keyLabel');
+  if (lbl) lbl.innerText = activeKeyName.length > 9 ? activeKeyName.slice(0,7) + '…' : activeKeyName;
+  const foot = document.getElementById('keyFooterName');
+  if (foot) foot.innerText = activeKeyName;
+  const dak = document.getElementById('drawerActiveKeyName');
+  if (dak) dak.innerText = activeKeyName;
+  updateDrawerAlgo();
+}
+function renderDrawerKeys() {
+  const el = document.getElementById('drawerKeys'); el.innerHTML = '';
+  savedKeys.forEach((k, i) => {
+    const str  = keyStrength(k.val);
+    const item = document.createElement('div');
+    item.className = 'key-sel-item' + (k.val === activeKey ? ' active' : '');
+    item.onclick = () => selectKey(i);
+    item.innerHTML = `<div class="key-strength ks-${str}"></div><div style="flex:1;min-width:0;"><div class="key-sel-name">${k.name}</div><div class="key-sel-val">${k.val.length>18?k.val.slice(0,16)+'…':k.val}</div></div>${k.val===activeKey?'<span class="key-sel-check">✓</span>':''}<button style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:transparent;color:var(--muted);font-size:12px;cursor:pointer;flex-shrink:0;" onclick="deleteKey(${i},event)">🗑</button>`;
+    el.appendChild(item);
+  });
+}
+
+// ══════════════════════════════════════════
+//  SEND
+// ══════════════════════════════════════════
+async function sendMsg() {
+  const input = document.getElementById('msgInput');
+  const text  = input.value.trim();
+  if (!text) { toast('Type something first', 'e'); return; }
+  document.getElementById('emptyState').style.display = 'none';
+
+  let result;
+  if (algo === 'aes') {
+    const btn = document.querySelector('.send-btn'); btn.innerText = '⏳'; btn.disabled = true;
+    try { result = mode === 'encode' ? await aesEncrypt(text, activeKey) : await aesDecrypt(text, activeKey); }
+    finally { btn.innerText = '➤'; btn.disabled = false; }
+  } else if (algo === 'caesar') {
+    result = mode === 'encode' ? caesarEncrypt(text, caesarShift) : caesarDecrypt(text, caesarShift);
+  } else {
+    result = mode === 'encode' ? substEncrypt(text, activeKey) : substDecrypt(text, activeKey);
+  }
+
+  const now   = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+  const entry = {id:Date.now(), mode, algo, input:text, result, key:activeKeyName, keyVal:activeKey, time:now, starred:false};
+  history.unshift(entry); if (history.length > 300) history.pop();
+  S.set('te_hist', history); updateBadges(); addPair(entry);
+  input.value = ''; input.style.height = 'auto';
+  document.getElementById('charCounter').innerText = '0 chars';
+  if (autoLockMins) resetAutoLock();
+  const chat = document.getElementById('chat');
+  setTimeout(() => { chat.scrollTop = chat.scrollHeight; }, 60);
+}
+
+function addPair(entry) {
+  const chat = document.getElementById('chat');
+  const pair = document.createElement('div');
+  pair.className   = 'msg-pair';
+  pair.dataset.id  = entry.id;
+  pair.dataset.text = (entry.input + ' ' + entry.result).toLowerCase();
+
+  const algoBadge = `<span class="algo-badge">${(entry.algo||'subst').toUpperCase()}</span>`;
+  const isAES     = entry.algo === 'aes';
+
+  const wr = document.createElement('div'); wr.className = 'msg-wrap right';
+  wr.innerHTML = `<div class="msg-meta"><span class="msg-tag">${entry.mode==='encode'?'INPUT':'CIPHERTEXT'}</span><span class="msg-time">${entry.time}</span><span class="msg-keyname">🔑 ${entry.key}</span>${algoBadge}</div>`;
+  const br = document.createElement('div'); br.className = 'msg right'; br.innerText = entry.input;
+  br.onclick = () => copyMsg(entry.input, br); wr.appendChild(br);
+
+  const wl = document.createElement('div'); wl.className = 'msg-wrap left';
+  const bl = document.createElement('div'); bl.className = 'msg left' + (isAES ? ' aes-left' : '');
+  bl.innerText = entry.result; bl.onclick = () => copyMsg(entry.result, bl); wl.appendChild(bl);
+
+  const cc = document.createElement('div'); cc.className = 'char-count';
+  cc.innerText = `${entry.result.length} chars`; wl.appendChild(cc);
+
+  const acts = document.createElement('div'); acts.className = 'msg-actions';
+  const starBtn = mkActBtn(entry.starred ? '⭐ Starred' : '☆ Star', () => toggleStar(entry.id, starBtn));
+  if (entry.starred) starBtn.classList.add('starred-btn');
+  acts.appendChild(mkActBtn('⎘ Copy',   () => copyMsg(entry.result, bl)));
+  acts.appendChild(mkActBtn('📱 QR',    () => showQR(entry.result)));
+  acts.appendChild(mkActBtn('↗ Share',  () => shareText(entry.result)));
+  acts.appendChild(starBtn);
+  acts.appendChild(mkActBtn('🗑 Delete', () => deletePair(entry.id, pair), 'del-btn'));
+
+  pair.appendChild(wr); pair.appendChild(wl); pair.appendChild(acts);
+  chat.appendChild(pair);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function mkActBtn(label, fn, extra='') {
+  const b = document.createElement('button');
+  b.className = 'act-btn ' + (extra || ''); b.innerText = label; b.onclick = fn; return b;
+}
+
+function deletePair(id, pairEl) {
+  history = history.filter(h => h.id !== id);
+  starred = starred.filter(s => s.id !== id);
+  S.set('te_hist', history);
+  S.set('te_star', starred);
+  pairEl.style.opacity = '0';
+  pairEl.style.transform = 'translateX(30px)';
+  pairEl.style.transition = 'all .25s';
+  setTimeout(() => {
+    pairEl.remove();
+    if (!document.querySelector('.msg-pair')) {
+      document.getElementById('emptyState').style.display = 'flex';
+    }
+  }, 250);
+  updateBadges();
+  toast('Deleted', 'i');
+}
+
+// ══════════════════════════════════════════
+//  COPY / SHARE / QR
+// ══════════════════════════════════════════
+function copyMsg(text, el) {
+  navigator.clipboard.writeText(text).catch(() => {
+    const ta = document.createElement('textarea'); ta.value = text;
+    document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+  });
+  if (el) {
+    const flash = document.createElement('div'); flash.className = 'msg-flash';
+    el.appendChild(flash); setTimeout(() => flash.remove(), 450);
+    el.classList.add('copied'); setTimeout(() => el.classList.remove('copied'), 500);
+  }
+  toast('Copied!', 's');
+}
+function shareText(text) {
+  if (navigator.share) navigator.share({text}).catch(() => {});
+  else { copyMsg(text, null); toast('Copied to clipboard', 'i'); }
+}
+function showQR(text) {
+  qrCurrentText = text;
+  const container = document.getElementById('qrCanvas'); container.innerHTML = '';
+  document.getElementById('qrText').innerText = text.length > 100 ? text.slice(0,100) + '…' : text;
+  try {
+    new QRCode(container, {text:text.slice(0,500), width:200, height:200, colorDark:'#000', colorLight:'#fff', correctLevel:QRCode.CorrectLevel.M});
+  } catch {
+    container.innerHTML = '<div style="width:200px;height:200px;display:flex;align-items:center;justify-content:center;background:#fff;border-radius:8px;color:#333;font-size:12px;text-align:center;padding:16px;">Text too long for QR</div>';
+  }
+  openSheet('qrSheet');
+}
+function copyQRText() { copyMsg(qrCurrentText, null); }
+
+// ══════════════════════════════════════════
+//  INPUT HANDLING
+// ══════════════════════════════════════════
+function onInputChange(ta) {
+  ta.style.height = 'auto';
+  ta.style.height = Math.min(ta.scrollHeight, 110) + 'px';
+  const len = ta.value.length;
+  const cc  = document.getElementById('charCounter');
+  cc.innerText = len + ' chars';
+  cc.classList.toggle('warn', len > 500);
+}
+document.getElementById('msgInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg(); }
+});
+
+// ══════════════════════════════════════════
+//  MODE
+// ══════════════════════════════════════════
+document.getElementById('encBtn').onclick = () => {
+  mode = 'encode';
+  document.getElementById('encBtn').classList.add('active');
+  document.getElementById('decBtn').classList.remove('active');
+  document.getElementById('modeChip').innerText = 'ENCRYPT';
+};
+document.getElementById('decBtn').onclick = () => {
+  mode = 'decode';
+  document.getElementById('decBtn').classList.add('active');
+  document.getElementById('encBtn').classList.remove('active');
+  document.getElementById('modeChip').innerText = 'DECRYPT';
+};
+
+// ══════════════════════════════════════════
+//  STAR
+// ══════════════════════════════════════════
+function toggleStar(id, btn) {
+  const item = history.find(h => h.id === id); if (!item) return;
+  item.starred = !item.starred;
+  if (item.starred) { if (!starred.find(s => s.id === id)) starred.unshift(item); }
+  else starred = starred.filter(s => s.id !== id);
+  S.set('te_hist', history); S.set('te_star', starred);
+  btn.innerText = item.starred ? '⭐ Starred' : '☆ Star';
+  btn.classList.toggle('starred-btn', item.starred);
+  updateBadges(); toast(item.starred ? 'Starred ⭐' : 'Unstarred', 'g');
+}
+
+// ══════════════════════════════════════════
+//  SEARCH
+// ══════════════════════════════════════════
+function toggleSearch() {
+  const bar = document.getElementById('searchBar');
+  bar.style.display = bar.style.display === 'block' ? 'none' : 'block';
+  if (bar.style.display === 'block') document.getElementById('searchInput').focus();
+  else { document.getElementById('searchInput').value = ''; filterChat(''); }
+}
+function closeSearch() {
+  document.getElementById('searchBar').style.display = 'none';
+  document.getElementById('searchInput').value = ''; filterChat('');
+}
+document.getElementById('searchInput').addEventListener('input', e => filterChat(e.target.value.toLowerCase()));
+function filterChat(q) {
+  document.querySelectorAll('.msg-pair').forEach(p => p.classList.toggle('hidden', q && !p.dataset.text?.includes(q)));
+}
+
+// ══════════════════════════════════════════
+//  HISTORY — build nice cards
+// ══════════════════════════════════════════
+function buildHistCard(item) {
+  const isEnc = item.mode === 'encode';
+  const isAES = item.algo === 'aes';
+  const card  = document.createElement('div');
+  card.className = 'hist-item' + (item.starred ? ' starred-item' : '');
+
+  const algoLabel = (item.algo || 'subst').toUpperCase();
+  const cipherClass = isAES ? 'cipher-aes' : 'cipher';
+
+  card.innerHTML = `
+    <div class="hist-card-header">
+      <div class="hist-mode-badge ${isEnc ? 'enc' : 'dec'}">
+        <div class="hist-mode-dot"></div>
+        ${isEnc ? '↑ ENCRYPT' : '↓ DECRYPT'}
+      </div>
+      <span class="hist-algo-badge">${algoLabel}</span>
+      ${item.starred ? '<span class="hist-star-icon">⭐</span>' : ''}
+      <div class="hist-meta-right">
+        <span class="hist-key-tag">🔑 ${item.key}</span>
+        <span class="hist-time">${item.time}</span>
+      </div>
+    </div>
+    <div class="hist-card-body">
+      <div class="hist-row">
+        <div class="hist-row-label">${isEnc ? 'Plaintext' : 'Ciphertext'}</div>
+        <div class="hist-row-text plain">${escHtml(item.input)}</div>
+      </div>
+      <div class="hist-divider"></div>
+      <div class="hist-row">
+        <div class="hist-row-label">${isEnc ? 'Encrypted' : 'Decrypted'}</div>
+        <div class="hist-row-text ${cipherClass}">${escHtml(item.result)}</div>
+      </div>
+    </div>
+    <div class="hist-copy-hint">
+      <span>TAP TO COPY RESULT</span>
+    </div>
+  `;
+  card.onclick = () => { copyMsg(item.result, null); closeAllSheets(); };
+  return card;
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function renderHistory() {
+  const el = document.getElementById('histList'); if (!el) return;
+  el.innerHTML = '';
+  const q = (document.getElementById('histSearch')?.value || '').toLowerCase();
+  const items = history.filter(h =>
+    (histTab==='all' || h.mode===histTab) &&
+    (!q || h.input.toLowerCase().includes(q) || h.result.toLowerCase().includes(q))
+  );
+  if (!items.length) { el.innerHTML = '<div class="empty-msg">Nothing here yet.</div>'; return; }
+  items.forEach(item => el.appendChild(buildHistCard(item)));
+}
+function filterHistory() { renderHistory(); }
+function setHistTab(tab, btn) {
+  histTab = tab;
+  document.querySelectorAll('.hist-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderHistory();
+}
+
+function renderStars() {
+  const el = document.getElementById('starsList'); el.innerHTML = '';
+  if (!starred.length) {
+    el.innerHTML = '<div class="empty-msg">No starred messages yet.<br>Tap ☆ Star on any message.</div>';
+    return;
+  }
+  starred.forEach(item => el.appendChild(buildHistCard(item)));
+}
+
+function renderStats() {
+  const el = document.getElementById('statsBody'); if (!el) return;
+  const enc = history.filter(h => h.mode === 'encode').length;
+  const dec = history.filter(h => h.mode === 'decode').length;
+  const algoCounts = {};
+  history.forEach(h => { const a = h.algo||'subst'; algoCounts[a] = (algoCounts[a]||0) + 1; });
+  const keyUse = {};
+  history.forEach(h => { keyUse[h.key] = (keyUse[h.key]||0) + 1; });
+  const topKey = Object.entries(keyUse).sort((a,b) => b[1]-a[1])[0];
+  const totalChars = history.reduce((sum, h) => sum + h.result.length, 0);
+  el.innerHTML = `<div class="stats-grid"><div class="stat-card"><div class="stat-num">${history.length}</div><div class="stat-label">TOTAL OPS</div></div><div class="stat-card"><div class="stat-num">${starred.length}</div><div class="stat-label">STARRED</div></div><div class="stat-card"><div class="stat-num">${enc}</div><div class="stat-label">ENCRYPTED</div></div><div class="stat-card"><div class="stat-num">${dec}</div><div class="stat-label">DECRYPTED</div></div></div><div class="stat-card" style="margin-bottom:10px;"><div class="stat-label" style="text-align:left;margin-bottom:8px;">Algorithm usage</div>${Object.entries(algoCounts).map(([a,c])=>`<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;"><span class="algo-badge" style="flex-shrink:0;">${a.toUpperCase()}</span><div style="flex:1;background:var(--surface2);border-radius:4px;height:6px;overflow:hidden;"><div style="width:${Math.round(c/history.length*100)}%;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:4px;"></div></div><span style="font-size:10px;color:var(--text2);font-family:var(--fm);">${c}</span></div>`).join('')||'<div class="empty-msg">No data yet.</div>'}</div>${topKey?`<div class="stat-card"><div class="stat-label">Most used key</div><div style="font-family:var(--ff);font-size:15px;font-weight:800;color:var(--text);margin-top:4px;">🔑 ${topKey[0]} <span style="color:var(--muted);font-size:12px;font-weight:400;">(${topKey[1]}x)</span></div></div>`:''}<div class="stat-card" style="margin-top:10px;"><div class="stat-label">Total chars encrypted</div><div class="stat-num" style="font-size:20px;">${totalChars.toLocaleString()}</div></div>`;
+}
+
+function updateBadges() {
+  document.getElementById('histBadge').innerText = history.length;
+  document.getElementById('starBadge').innerText = starred.length;
+}
+
+// ══════════════════════════════════════════
+//  THEME
+// ══════════════════════════════════════════
+function toggleTheme() {
+  lightMode = !lightMode;
+  document.body.classList.toggle('light', lightMode);
+  document.getElementById('themeToggle').classList.toggle('on', lightMode);
+  S.set('te_light', lightMode);
+}
+
+// ══════════════════════════════════════════
+//  EXPORT
+// ══════════════════════════════════════════
+function exportChat() {
+  if (!history.length) { toast('Nothing to export', 'e'); return; }
+  const lines = history.map(h => `[${h.time}] ${h.mode.toUpperCase()} | ALGO: ${(h.algo||'subst').toUpperCase()} | KEY: ${h.key}\nIN:  ${h.input}\nOUT: ${h.result}`).join('\n\n---\n\n');
+  downloadBlob(lines, 'text/plain', `ASTRA_${Date.now()}.txt`);
+  toast('Exported ✓', 's');
+}
+function exportJSON() {
+  if (!history.length) { toast('Nothing to export', 'e'); return; }
+  downloadBlob(JSON.stringify({exported:new Date().toISOString(), count:history.length, entries:history}, null, 2), 'application/json', `ASTRA_${Date.now()}.json`);
+  toast('JSON exported ✓', 's');
+}
+function downloadBlob(content, mime, filename) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([content], {type:mime}));
+  a.download = filename; a.click();
+}
+
+// ══════════════════════════════════════════
+//  CHANGE CREDENTIALS
+// ══════════════════════════════════════════
+function toggleChangePw() {
+  const f = document.getElementById('changePwForm');
+  f.style.display = (f.style.display === 'none' || !f.style.display) ? 'flex' : 'none';
+  document.getElementById('changePwErr').innerText = '';
+  ['currPass','newPass1','newPass2','newPin','newPinConfirm'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+}
+
+async function changeCredentials() {
+  const curr       = document.getElementById('currPass').value;
+  const n1         = document.getElementById('newPass1').value;
+  const n2         = document.getElementById('newPass2').value;
+  const newPin     = document.getElementById('newPin').value;
+  const newPinConf = document.getElementById('newPinConfirm').value;
+  const err        = document.getElementById('changePwErr');
+
+  if ((await hashStr(curr)) !== PW_HASH) { err.innerText = '⚠ Current password is wrong'; return; }
+  if (n1 || n2) {
+    if (n1.length < 4)  { err.innerText = '⚠ New password too short (min 4)'; return; }
+    if (n1 !== n2)      { err.innerText = '⚠ New passwords do not match'; return; }
+  }
+  if (newPin || newPinConf) {
+    if (newPin.length < 4 || newPin.length > 16 || isNaN(newPin)) {
+      err.innerText = '⚠ PIN must be 4–16 digits'; return;
+    }
+    if (newPin !== newPinConf) {
+      err.innerText = '⚠ PIN entries do not match'; return;
+    }
+  }
+
+  if (n1) { PW_HASH = await hashStr(n1); S.set('te_pwh', PW_HASH); }
+  if (newPin) {
+    PIN_HASH = await hashStr(newPin);
+    PIN_LEN  = newPin.length;
+    S.set('te_pinh',   PIN_HASH);
+    S.set('te_pinlen', PIN_LEN);
+    lockMode = 'pin';
+    toast('Password & PIN updated ✓', 's');
+  } else if (n1) {
+    toast('Password updated ✓', 's');
+  } else {
+    toast('No changes made', 'i'); return;
+  }
+
+  ['currPass','newPass1','newPass2','newPin','newPinConfirm'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  document.getElementById('changePwForm').style.display = 'none';
+}
+
+// ══════════════════════════════════════════
+//  CLEAR
+// ══════════════════════════════════════════
+function confirmClear() {
+  showConfirm('Clear All History?', 'This permanently deletes all messages. Cannot be undone.', '🗑', () => {
+    history = []; starred = [];
+    S.del('te_hist'); S.del('te_star');
+    document.querySelectorAll('.msg-pair').forEach(e => e.remove());
+    document.getElementById('emptyState').style.display = 'flex';
+    updateBadges(); closeAllSheets();
+    toast('All history cleared', 'i');
+  });
+}
+
+// ══════════════════════════════════════════
+//  DRAWER
+// ══════════════════════════════════════════
+function openDrawer() {
+  renderDrawerKeys();
+  updateKeyBadge();
+  document.getElementById('drawer').classList.add('open');
+  document.getElementById('drawerBackdrop').classList.add('open');
+}
+function closeDrawer() {
+  document.getElementById('drawer').classList.remove('open');
+  document.getElementById('drawerBackdrop').classList.remove('open');
+}
+
+// ══════════════════════════════════════════
+//  SHEETS
+// ══════════════════════════════════════════
+function openSheet(id) {
+  closeAllSheets(true);
+  if (id === 'histSheet')  renderHistory();
+  if (id === 'starsSheet') renderStars();
+  if (id === 'statsSheet') renderStats();
+  document.getElementById(id).classList.add('open');
+  document.getElementById('shBd').classList.add('open');
+}
+function closeAllSheets() {
+  document.querySelectorAll('.sheet').forEach(s => s.classList.remove('open'));
+  document.getElementById('shBd').classList.remove('open');
+}
+
+// ══════════════════════════════════════════
+//  CONFIRM DIALOG
+// ══════════════════════════════════════════
+let confirmCallback = null;
+function showConfirm(title, sub, icon, cb) {
+  document.getElementById('confirmTitle').innerText = title;
+  document.getElementById('confirmSub').innerText   = sub;
+  document.getElementById('confirmIcon').innerText  = icon || '⚠️';
+  confirmCallback = cb;
+  document.getElementById('confirmDlg').classList.add('open');
+}
+function closeConfirm() { document.getElementById('confirmDlg').classList.remove('open'); confirmCallback = null; }
+document.getElementById('confirmOk').onclick = () => { if (confirmCallback) confirmCallback(); closeConfirm(); };
+
+// ══════════════════════════════════════════
+//  TOAST
+// ══════════════════════════════════════════
+let toastTimer;
+function toast(msg, type='') {
+  const t = document.getElementById('toast'); t.innerText = msg;
+  t.className = type ? `show ${type}` : 'show';
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.className = '', 2400);
+}
+</script>
+</body>
+</html>
